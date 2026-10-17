@@ -88,6 +88,14 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(first[0]["in_canada"], 1)
         self.assertEqual(len(first), len(normal))  # same rows, only reordered
 
+    def test_country_counts_ignore_country_filter(self):
+        rows = q.country_counts(self.conn, q.Filters(country="Canada"))
+        self.assertEqual({r["country"]: r["n"] for r in rows}, {"US": 4, "Canada": 1})
+
+    def test_top_regions_scoped_to_selected_country(self):
+        rows = q.top_regions(self.conn, q.Filters(country="Canada"))
+        self.assertEqual([r["region"] for r in rows], ["ON"])
+
     def test_open_rate_by_age(self):
         rows = {r["age_weeks"]: r for r in q.open_rate_by_age(self.conn, q.Filters())}
         self.assertEqual(rows[0]["n"], 3)          # #1, #2, #8 posted this week
@@ -135,7 +143,7 @@ class ApiTest(unittest.TestCase):
 
     def test_every_endpoint_returns_json(self):
         for path in ["options", "summary", "trend", "roles", "companies", "regions", "open-rate", "degrees",
-                     "canada", "listings", "listings?canada_first=1"]:
+                     "canada", "countries", "listings", "listings?canada_first=1"]:
             with self.subTest(path=path):
                 status, body = self.get(f"/api/{path}")
                 self.assertEqual(status, 200)

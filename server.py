@@ -28,6 +28,7 @@ ENDPOINTS = {
     "/api/open-rate": q.open_rate_by_age,
     "/api/degrees": q.degree_requirements,
     "/api/canada": q.canada_overview,
+    "/api/countries": q.country_counts,
 }
 
 

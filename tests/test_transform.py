@@ -75,6 +75,19 @@ class ParseLocationTest(unittest.TestCase):
         loc = parse_location("Remote in Canada")
         self.assertEqual((loc.country, loc.remote), ("Canada", True))
 
+    def test_country_is_last_part_not_first_unknown(self):
+        loc = parse_location("Chennai, Tamil Nadu, India")
+        self.assertEqual((loc.city, loc.region, loc.country), ("Chennai", "Tamil Nadu", "India"))
+        self.assertEqual(parse_location("Sant Cugat, Barcelona, Spain").country, "Spain")
+        self.assertEqual(parse_location("Dubai - United Arab Emirates").country, "United Arab Emirates")
+
+    def test_single_country_name(self):
+        loc = parse_location("Remote in Germany")
+        self.assertEqual((loc.city, loc.country, loc.remote), (None, "Germany", True))
+
+    def test_garbage_region_gives_no_country(self):
+        self.assertIsNone(parse_location("Seattle, W").country)
+
     def test_aliases(self):
         loc = parse_location("NYC")
         self.assertEqual((loc.city, loc.region), ("New York", "NY"))

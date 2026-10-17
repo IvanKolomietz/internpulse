@@ -98,13 +98,25 @@ def top_companies(conn, f: Filters, limit: int = 15) -> list[dict]:
 
 
 def top_regions(conn, f: Filters, limit: int = 15) -> list[dict]:
+    """On-site postings by state/province. With a country selected, only that country's places."""
     w, p = f.where()
+    in_country, extra = ("AND x.country = ?", [f.country]) if f.country else ("", [])
     return _rows(conn, f"""
-        SELECT COALESCE(x.region, x.country, 'Unknown') AS region, x.country,
+        SELECT COALESCE(x.region, x.city, x.country, 'Unknown') AS region, x.country,
                COUNT(DISTINCT l.id) AS n
         FROM listings l JOIN listing_locations x ON x.listing_id = l.id
-        WHERE {w} AND x.remote = 0
-        GROUP BY 1, 2 ORDER BY n DESC LIMIT ?""", p + [limit])
+        WHERE {w} AND x.remote = 0 {in_country}
+        GROUP BY 1, 2 ORDER BY n DESC LIMIT ?""", p + extra + [limit])
+
+
+def country_counts(conn, f: Filters) -> list[dict]:
+    """Postings per country under every filter except country (feeds the country dropdown)."""
+    w, p = replace(f, country=None).where()
+    return _rows(conn, f"""
+        SELECT x.country, COUNT(DISTINCT l.id) AS n
+        FROM listings l JOIN listing_locations x ON x.listing_id = l.id
+        WHERE {w} AND x.country IS NOT NULL
+        GROUP BY x.country ORDER BY n DESC, x.country""", p)
 
 
 def open_rate_by_age(conn, f: Filters) -> list[dict]:
@@ -177,5 +189,5 @@ def filter_options(conn) -> dict:
             "SELECT role FROM listings GROUP BY role ORDER BY COUNT(*) DESC")],
         "countries": [r[0] for r in conn.execute(
             "SELECT country FROM listing_locations WHERE country IS NOT NULL"
-            " GROUP BY country HAVING COUNT(*) >= 5 ORDER BY COUNT(*) DESC")],
+            " GROUP BY country ORDER BY COUNT(*) DESC")],
     }

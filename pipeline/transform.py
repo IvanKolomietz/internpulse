@@ -29,7 +29,16 @@ US_STATE_NAMES = {
     "wyoming": "WY", "district of columbia": "DC", "washington dc": "DC", "washington, dc": "DC",
 }
 CA_PROVINCES = {"ON", "QC", "BC", "AB", "MB", "SK", "NS", "NB", "NL", "PE", "NT", "YT", "NU"}
-US_ALIASES = {"usa", "us", "united states", "united states of america", "u.s."}
+OTHER_COUNTRIES = {
+    name.lower(): name for name in [
+        "Germany", "France", "Spain", "Ireland", "Netherlands", "Switzerland", "India", "Israel",
+        "Japan", "China", "Singapore", "Australia", "Mexico", "Brazil", "Poland", "Portugal",
+        "Italy", "Sweden", "Denmark", "Belgium", "Austria", "Hong Kong", "Taiwan", "South Korea",
+        "United Arab Emirates", "Luxembourg", "Czech Republic", "Romania", "Philippines", "Vietnam",
+    ]
+}
+OTHER_COUNTRIES.update({"uae": "United Arab Emirates", "dubai - united arab emirates": "United Arab Emirates"})
+US_ALIASES ={"usa", "us", "united states", "united states of america", "u.s."}
 CA_PROVINCE_NAMES = {
     "ontario": "ON", "quebec": "QC", "québec": "QC", "british columbia": "BC", "alberta": "AB",
     "manitoba": "MB", "saskatchewan": "SK", "nova scotia": "NS", "new brunswick": "NB",
@@ -132,7 +141,8 @@ def parse_location(raw: str) -> Location:
     parts = [p.strip() for p in rest.split(",") if p.strip()]
     city = parts[0] if len(parts) > 1 else None
     region = country = None
-    tail = [p.upper() for p in parts[1:]] if len(parts) > 1 else [parts[0].upper()]
+    unknown: list[str] = []
+    tail =[p.upper() for p in parts[1:]] if len(parts) > 1 else [parts[0].upper()]
 
     for token in tail:
         low_tok = token.lower()
@@ -151,10 +161,16 @@ def parse_location(raw: str) -> Location:
             country = "US"
         elif token in {"CANADA"}:
             country = "Canada"
-        elif token in {"UK", "UNITED KINGDOM", "ENGLAND"}:
+        elif token in {"UK", "UNITED KINGDOM", "ENGLAND", "SCOTLAND", "WALES"}:
             country = "UK"
-        else:
-            country = country or token.title()
+        elif low_tok in OTHER_COUNTRIES:
+            country = OTHER_COUNTRIES[low_tok]
+        elif len(token) > 2:
+            unknown.append(token.title())
+
+    # "Chennai, Tamil Nadu, India": an unrecognized middle part is the region.
+    if unknown and country and region is None and len(parts) > 2:
+        region = unknown[-1]
 
     # "Ontario, Canada" / "Texas, USA": the first part is a region, not a city.
     if city and region is None:
@@ -165,9 +181,9 @@ def parse_location(raw: str) -> Location:
             region, city = US_STATE_NAMES[city.lower()], None
             country = country or "US"
 
-    if len(parts) == 1 and country and country not in {"US", "Canada", "UK"} and region is None:
-        # Single token that isn't a known place code: treat it as a city of unknown country.
-        city, country = parts[0], None
+    if len(parts) == 1 and country is None and region is None:
+        # Single token that isn't a known place: treat it as a city of unknown country.
+        city = parts[0]
     return Location(s, city, region, country, remote)
 
 

@@ -39,7 +39,7 @@ SimplifyJobs JSON ──► pipeline/ (Python)          ──► SQLite (normal
 | `analytics/queries.py` | SQL analytics: CTEs, conditional aggregation, date bucketing; all filters are bound parameters (SQL-injection safe) |
 | `server.py` | Standard-library REST API with input validation (400s), 404s, read-only DB connections |
 | `static/` | React 18 dashboard (no build step) with Chart.js; light/dark mode, responsive |
-| `tests/` | 35 unit + integration tests: classifier edge cases, parser cases, known-answer fixture DB, API status codes, injection attempt |
+| `tests/` | 40 unit + integration tests: classifier edge cases, parser cases, known-answer fixture DB, API status codes, injection attempt |
 | `.github/workflows/ci.yml` | CI matrix (Ubuntu + Windows × Python 3.11/3.12) plus a weekly live-data smoke test that catches upstream schema drift |
 
 **Zero dependencies.** Everything runs on the Python 3.11+ standard library.
