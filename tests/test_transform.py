@@ -66,6 +66,15 @@ class ParseLocationTest(unittest.TestCase):
         self.assertEqual(parse_location("Toronto, ON").region, "ON")
         self.assertEqual(parse_location("London, UK").country, "UK")
 
+    def test_canadian_province_names_and_cities(self):
+        loc = parse_location("Ontario, Canada")
+        self.assertEqual((loc.region, loc.country), ("ON", "Canada"))
+        self.assertEqual(parse_location("Montreal, Quebec").region, "QC")
+        loc = parse_location("Toronto")
+        self.assertEqual((loc.city, loc.region, loc.country), ("Toronto", "ON", "Canada"))
+        loc = parse_location("Remote in Canada")
+        self.assertEqual((loc.country, loc.remote), ("Canada", True))
+
     def test_aliases(self):
         loc = parse_location("NYC")
         self.assertEqual((loc.city, loc.region), ("New York", "NY"))

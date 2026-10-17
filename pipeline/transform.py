@@ -28,14 +28,29 @@ US_STATE_NAMES = {
     "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI",
     "wyoming": "WY", "district of columbia": "DC", "washington dc": "DC", "washington, dc": "DC",
 }
-CA_PROVINCES ={"ON", "QC", "BC", "AB", "MB", "SK", "NS", "NB", "NL", "PE"}
+CA_PROVINCES = {"ON", "QC", "BC", "AB", "MB", "SK", "NS", "NB", "NL", "PE", "NT", "YT", "NU"}
 US_ALIASES = {"usa", "us", "united states", "united states of america", "u.s."}
+CA_PROVINCE_NAMES = {
+    "ontario": "ON", "quebec": "QC", "québec": "QC", "british columbia": "BC", "alberta": "AB",
+    "manitoba": "MB", "saskatchewan": "SK", "nova scotia": "NS", "new brunswick": "NB",
+    "newfoundland and labrador": "NL", "prince edward island": "PE",
+}
+# Nicknames and well-known cities that often appear without a region: name -> (city, region, country)
 CITY_ALIASES = {
-    "nyc": ("New York", "NY"),
-    "new york city": ("New York", "NY"),
-    "sf": ("San Francisco", "CA"),
-    "south sf": ("South San Francisco", "CA"),
-    "bay area": ("San Francisco", "CA"),
+    "nyc": ("New York", "NY", "US"),
+    "new york city": ("New York", "NY", "US"),
+    "sf": ("San Francisco", "CA", "US"),
+    "south sf": ("South San Francisco", "CA", "US"),
+    "bay area": ("San Francisco", "CA", "US"),
+    "toronto": ("Toronto", "ON", "Canada"),
+    "gta": ("Toronto", "ON", "Canada"),
+    "mississauga": ("Mississauga", "ON", "Canada"),
+    "ottawa": ("Ottawa", "ON", "Canada"),
+    "vancouver": ("Vancouver", "BC", "Canada"),
+    "montreal": ("Montreal", "QC", "Canada"),
+    "montréal": ("Montreal", "QC", "Canada"),
+    "calgary": ("Calgary", "AB", "Canada"),
+    "edmonton": ("Edmonton", "AB", "Canada"),
 }
 
 # Raw categories drift over time ("Software" vs "Software Engineering"); collapse them.
@@ -110,7 +125,7 @@ def parse_location(raw: str) -> Location:
 
     alias = CITY_ALIASES.get(rest.lower())
     if alias:
-        return Location(s, alias[0], alias[1], "US", remote)
+        return Location(s, *alias, remote)
     if rest.lower() in US_ALIASES:
         return Location(s, None, None, "US", remote)
 
@@ -122,8 +137,10 @@ def parse_location(raw: str) -> Location:
     for token in tail:
         low_tok = token.lower()
         if low_tok in CITY_ALIASES:
-            region, country = CITY_ALIASES[low_tok][1], "US"
-            city = city or CITY_ALIASES[low_tok][0]
+            alias_city, region, country = CITY_ALIASES[low_tok]
+            city = city or alias_city
+        elif low_tok in CA_PROVINCE_NAMES:
+            region, country = CA_PROVINCE_NAMES[low_tok], "Canada"
         elif low_tok in US_STATE_NAMES:
             region, country = US_STATE_NAMES[low_tok], "US"
         elif token in US_STATES:
@@ -138,6 +155,15 @@ def parse_location(raw: str) -> Location:
             country = "UK"
         else:
             country = country or token.title()
+
+    # "Ontario, Canada" / "Texas, USA": the first part is a region, not a city.
+    if city and region is None:
+        if city.lower() in CA_PROVINCE_NAMES:
+            region, city = CA_PROVINCE_NAMES[city.lower()], None
+            country = country or "Canada"
+        elif city.lower() in US_STATE_NAMES:
+            region, city = US_STATE_NAMES[city.lower()], None
+            country = country or "US"
 
     if len(parts) == 1 and country and country not in {"US", "Canada", "UK"} and region is None:
         # Single token that isn't a known place code: treat it as a city of unknown country.

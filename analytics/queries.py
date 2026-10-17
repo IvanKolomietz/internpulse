@@ -6,7 +6,13 @@ All user input is passed as bound parameters, never string-formatted into SQL.
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+
+HOME_COUNTRY = "Canada"
+IN_HOME = (
+    "EXISTS (SELECT 1 FROM listing_locations hc WHERE hc.listing_id = {a}.id AND hc.country = '"
+    + HOME_COUNTRY + "')"
+)
 
 
 @dataclass
@@ -56,6 +62,7 @@ def summary(conn, f: Filters) -> dict:
         JOIN listing_locations x ON x.listing_id = l.id AND x.remote = 1
         WHERE {w}""", p)[0]["n"]
     row["remote"] = remote
+    row["canada"] = conn.execute(f"SELECT COUNT(*) FROM listings l WHERE {w} AND {IN_HOME.format(a='l')}", p).fetchone()[0]
     # Of postings 4-8 weeks old, how many have already closed? (the "apply early" signal)
     aged = _rows(conn, f"""
         SELECT COUNT(*) AS n, SUM(1 - l.active) AS closed FROM listings l
@@ -129,14 +136,36 @@ def degree_requirements(conn, f: Filters) -> list[dict]:
         FROM listings l WHERE {w} GROUP BY level ORDER BY n DESC""", p)
 
 
-def listings(conn, f: Filters, limit: int = 50, offset: int = 0) -> dict:
+def canada_overview(conn, f: Filters, limit: int = 8) -> dict:
+    """Canada-only breakdowns. Ignores the country filter so the panel always shows Canada."""
+    w, p = replace(f, country=HOME_COUNTRY).where()
+    provinces = _rows(conn, f"""
+        SELECT COALESCE(x.region, 'Remote / unspecified') AS province, COUNT(DISTINCT l.id) AS n
+        FROM listings l JOIN listing_locations x ON x.listing_id = l.id AND x.country = ?
+        WHERE {w} GROUP BY 1 ORDER BY n DESC""", [HOME_COUNTRY] + p)
+    cities = _rows(conn, f"""
+        SELECT x.city || ', ' || x.region AS city, COUNT(DISTINCT l.id) AS n
+        FROM listings l JOIN listing_locations x ON x.listing_id = l.id AND x.country = ?
+        WHERE {w} AND x.city IS NOT NULL AND x.region IS NOT NULL
+        GROUP BY 1 ORDER BY n DESC LIMIT ?""", [HOME_COUNTRY] + p + [limit])
+    companies = _rows(conn, f"""
+        SELECT l.company, COUNT(*) AS n, SUM(l.active) AS open
+        FROM listings l WHERE {w} GROUP BY l.company ORDER BY n DESC, l.company LIMIT ?""", p + [limit])
+    total = conn.execute(f"SELECT COUNT(*) FROM listings l WHERE {w}", p).fetchone()[0]
+    return {"total": total, "provinces": provinces, "cities": cities, "companies": companies}
+
+
+def listings(conn, f: Filters, limit: int = 50, offset: int = 0, home_first: bool = False) -> dict:
+    """Paged postings: open first, newest first; optionally postings in Canada before all others."""
     w, p = f.where()
     total = conn.execute(f"SELECT COUNT(*) FROM listings l WHERE {w}", p).fetchone()[0]
+    order = f"{IN_HOME.format(a='l')} DESC, " if home_first else ""
     rows = _rows(conn, f"""
         SELECT l.id, l.company, l.title, l.role, l.active, l.posted, l.url,
+               {IN_HOME.format(a='l')} AS in_canada,
                (SELECT GROUP_CONCAT(x.raw, ' | ') FROM listing_locations x WHERE x.listing_id = l.id) AS locations
         FROM listings l WHERE {w}
-        ORDER BY l.active DESC, l.posted DESC LIMIT ? OFFSET ?""", p + [limit, offset])
+        ORDER BY {order}l.active DESC, l.posted DESC LIMIT ? OFFSET ?""", p + [limit, offset])
     return {"total": total, "rows": rows}
 
 

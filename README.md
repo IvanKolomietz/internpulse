@@ -8,6 +8,8 @@ interactive dashboard answering questions like:
 - Which roles (SWE, Data Analytics, ML, QA, Quant…) have the most openings?
 - Where are the jobs, who is hiring, and which roles are open to undergrads?
 
+It is **Canada-focused** but keeps every country: a Canada panel (postings by province and city, and who is hiring there), a Canada KPI, Canadian provinces highlighted on the location chart, and a "Canada first" sort for the listings.
+
 Data source: the community-maintained [SimplifyJobs/Summer2027-Internships](https://github.com/SimplifyJobs/Summer2027-Internships) listings feed.
 
 ## Key findings (as of Oct 2026, Summer 2027 postings)
@@ -17,6 +19,7 @@ Data source: the community-maintained [SimplifyJobs/Summer2027-Internships](http
 - Posting volume ramps sharply in **August** and peaks in the **first week of September**.
 - Software Engineering and Data Science/ML make up roughly 70% of SWE/data-type postings;
   **QA/Test roles are scarce** (~2%), which means less competition for anyone who targets them.
+- Only ~4% of Summer 2027 postings in this source are in Canada (Ontario has about two-thirds of them), so Canadian students should also watch company career pages directly.
 - ~78% of postings are open to Bachelor's students. Only ~1.3% offer a remote option.
 
 ## Architecture
@@ -24,19 +27,19 @@ Data source: the community-maintained [SimplifyJobs/Summer2027-Internships](http
 ```
 SimplifyJobs JSON ──► pipeline/ (Python)          ──► SQLite (normalized)  ──► server.py (JSON API) ──► static/ (React + Chart.js)
                       extract · validate · clean       listings                 /api/summary, /trend,       filters, KPIs, charts,
-                      dedupe · classify · load         listing_terms            /roles, /open-rate, ...     searchable listings
+                      dedupe · classify · load         listing_terms            /canada, /open-rate, ...     searchable listings
                                                        listing_locations
 ```
 
 | Layer | What it shows |
 |---|---|
-| `pipeline/transform.py` | Data cleaning: category de-duplication, regex title → role classifier, location parser (US/Canada/UK, state names, aliases like "NYC"), term normalization |
+| `pipeline/transform.py` | Data cleaning: category de-duplication, regex title → role classifier, location parser (US/Canada/UK, state and province names, aliases like "NYC" and "Toronto"), term normalization |
 | `pipeline/ingest.py` | ETL with a data-quality report (rejected/duplicate/missing counts) and an atomic DB swap |
 | `pipeline/schema.sql` | Normalized schema (1-to-many terms and locations), indexes |
 | `analytics/queries.py` | SQL analytics: CTEs, conditional aggregation, date bucketing; all filters are bound parameters (SQL-injection safe) |
 | `server.py` | Standard-library REST API with input validation (400s), 404s, read-only DB connections |
 | `static/` | React 18 dashboard (no build step) with Chart.js; light/dark mode, responsive |
-| `tests/` | 31 unit + integration tests: classifier edge cases, parser cases, known-answer fixture DB, API status codes, injection attempt |
+| `tests/` | 35 unit + integration tests: classifier edge cases, parser cases, known-answer fixture DB, API status codes, injection attempt |
 | `.github/workflows/ci.yml` | CI matrix (Ubuntu + Windows × Python 3.11/3.12) plus a weekly live-data smoke test that catches upstream schema drift |
 
 **Zero dependencies.** Everything runs on the Python 3.11+ standard library.

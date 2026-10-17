@@ -27,6 +27,7 @@ ENDPOINTS = {
     "/api/regions": q.top_regions,
     "/api/open-rate": q.open_rate_by_age,
     "/api/degrees": q.degree_requirements,
+    "/api/canada": q.canada_overview,
 }
 
 
@@ -96,7 +97,8 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/listings":
                 return q.listings(conn, f,
                                   limit=int_param(qs, "limit", 50, 1, 200),
-                                  offset=int_param(qs, "offset", 0, 0, 1_000_000))
+                                  offset=int_param(qs, "offset", 0, 0, 1_000_000),
+                                  home_first=qs.get("canada_first", [""])[0] in {"1", "true"})
             return ENDPOINTS[path](conn, f)
         finally:
             conn.close()

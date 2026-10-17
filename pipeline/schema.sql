@@ -32,3 +32,4 @@ CREATE INDEX IF NOT EXISTS idx_listings_role    ON listings(role);
 CREATE INDEX IF NOT EXISTS idx_listings_posted  ON listings(posted);
 CREATE INDEX IF NOT EXISTS idx_terms_term       ON listing_terms(term);
 CREATE INDEX IF NOT EXISTS idx_locations_region ON listing_locations(region);
+CREATE INDEX IF NOT EXISTS idx_locations_listing ON listing_locations(listing_id, country);

@@ -14,6 +14,7 @@ const ROLE_COLORS = {
   "Product": "#64748b",
   "Other": "#cbd5e1",
 };
+const CANADA_RED = "#d52b1e";
 const fmt = (n) => (n == null ? "–" : Number(n).toLocaleString());
 const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -24,6 +25,7 @@ function qs(filters, extra = {}) {
   if (filters.active) p.set("active", "1");
   if (filters.country) p.set("country", filters.country);
   if (filters.q) p.set("q", filters.q);
+  if (filters.canadaFirst) p.set("canada_first", "1");
   for (const [k, v] of Object.entries(extra)) p.set(k, v);
   return p.toString();
 }
@@ -65,12 +67,16 @@ function Filters({ options, filters, setFilters, search, setSearch }) {
       </select>
       <select aria-label="Country" value=${filters.country} onChange=${(e) => setFilters((f) => ({ ...f, country: e.target.value }))}>
         <option value="">All countries</option>
-        ${options.countries.map((c) => html`<option key=${c} value=${c}>${c}</option>`)}
+        ${["Canada", ...options.countries.filter((c) => c !== "Canada")].map((c) => html`<option key=${c} value=${c}>${c}</option>`)}
       </select>
       <input type="search" placeholder="Search title or company…" value=${search} onInput=${(e) => setSearch(e.target.value)} />
       <label class="toggle">
         <input type="checkbox" checked=${filters.active} onChange=${(e) => setFilters((f) => ({ ...f, active: e.target.checked }))} />
         Open only
+      </label>
+      <label class="toggle">
+        <input type="checkbox" checked=${filters.canadaFirst} onChange=${(e) => setFilters((f) => ({ ...f, canadaFirst: e.target.checked }))} />
+        Canada first
       </label>
       <div class="chips">
         <button class=${"chip preset" + (isTargets ? " on" : "")}
@@ -88,10 +94,11 @@ function Kpis({ s }) {
     ["Still open", fmt(s.open), s.total ? `${Math.round((100 * s.open) / s.total)}% of postings` : ""],
     ["New this week", fmt(s.last_7_days), `latest ${s.latest_posted || "–"}`],
     ["Closed by week 8", s.closed_by_week_8_pct == null ? "–" : `${s.closed_by_week_8_pct}%`, "of postings 4–8 weeks old"],
+    ["In Canada", fmt(s.canada), s.total ? `${((100 * s.canada) / s.total).toFixed(1)}% of postings` : "", "ca"],
     ["Remote", fmt(s.remote), "postings with a remote option"],
   ];
-  return html`<div class="kpis">${tiles.map(([l, v, h]) => html`
-    <div class="kpi" key=${l}><div class="l">${l}</div><div class="v">${v}</div><div class="h">${h}</div></div>`)}</div>`;
+  return html`<div class="kpis">${tiles.map(([l, v, h, cls]) => html`
+    <div class=${"kpi " + (cls || "")} key=${l}><div class="l">${l}</div><div class="v">${v}</div><div class="h">${h}</div></div>`)}</div>`;
 }
 
 function trendConfig(rows) {
@@ -178,7 +185,7 @@ function Listings({ filters }) {
           <tr key=${r.id}>
             <td><strong>${r.company}</strong></td>
             <td>${r.title}<br/><span class="badge">${r.role}</span></td>
-            <td class="muted">${(r.locations || "").split(" | ").slice(0, 3).join(" · ")}</td>
+            <td class="muted">${r.in_canada ? html`<span class="badge ca">Canada</span> ` : null}${(r.locations || "").split(" | ").slice(0, 3).join(" · ")}</td>
             <td class="muted" style=${{ whiteSpace: "nowrap" }}>${r.posted}</td>
             <td>${r.active
               ? html`<a href=${r.url} target="_blank" rel="noopener noreferrer">Apply ↗</a>`
@@ -198,14 +205,14 @@ function App() {
   const [options, setOptions] = useState(null);
   const [search, setSearch] = useState("");
   const q = useDebounced(search);
-  const [base, setFilters] = useState({ term: "Summer 2027", roles: MY_TARGETS, active: false, country: "" });
+  const [base, setFilters] = useState({ term: "Summer 2027", roles: MY_TARGETS, active: false, country: "", canadaFirst: true });
   const filters = useMemo(() => ({ ...base, q }), [base, q]);
   const [d, setD] = useState({});
   const [error, setError] = useState(null);
 
   useEffect(() => { fetch("/api/options").then((r) => r.json()).then(setOptions).catch((e) => setError(e.message)); }, []);
   useEffect(() => {
-    const names = ["summary", "trend", "open-rate", "roles", "companies", "regions", "degrees"];
+    const names = ["summary", "trend", "open-rate", "roles", "companies", "regions", "degrees", "canada"];
     Promise.all(names.map((n) => api(n, filters)))
       .then((res) => { setD(Object.fromEntries(names.map((n, i) => [n, res[i]]))); setError(null); })
       .catch((e) => setError(e.message));
@@ -217,7 +224,9 @@ function App() {
       trend: trendConfig(d.trend),
       openRate: openRateConfig(d["open-rate"]),
       roles: hbarConfig(d.roles, "role", (r) => ROLE_COLORS[r.role] || ROLE_COLORS.Other),
-      regions: hbarConfig(d.regions, "region", css("--accent")),
+      regions: hbarConfig(d.regions, "region", (r) => (r.country === "Canada" ? CANADA_RED : css("--accent"))),
+      provinces: hbarConfig(d.canada.provinces, "province", CANADA_RED),
+      cities: hbarConfig(d.canada.cities, "city", CANADA_RED),
       degrees: hbarConfig(d.degrees, "level", css("--accent")),
     };
   }, [d]);
@@ -240,16 +249,29 @@ function App() {
           and ${d.summary.closed_by_week_8_pct}% have closed by week 8.</div>`}
       ${d.summary && html`
         <div class="grid">
+          <div class="card span-12 canada">
+            <h2>Canada focus</h2>
+            <p class="note">${fmt(d.canada.total)} postings with a Canadian location, using your role and term filters (country filter ignored here)</p>
+            ${d.canada.total === 0 ? html`<p class="muted">No Canadian postings match these filters.</p>` : html`
+            <div class="ca-grid">
+              <div><h3>By province</h3><${ChartBox} config=${configs.provinces} height=${200} /></div>
+              <div><h3>Top cities</h3><${ChartBox} config=${configs.cities} height=${200} /></div>
+              <div><h3>Hiring in Canada</h3>
+                <table><tbody>${d.canada.companies.map((c) => html`
+                  <tr key=${c.company}><td>${c.company}</td><td class="num">${c.n}</td><td class="num muted">${c.open} open</td></tr>`)}</tbody></table>
+              </div>
+            </div>`}
+          </div>
           <div class="card span-8"><h2>New postings per week</h2><p class="note">Last 26 weeks, stacked by role family</p><${ChartBox} config=${configs.trend} /></div>
           <div class="card span-4"><h2>How fast postings close</h2><p class="note">% still open by posting age</p><${ChartBox} config=${configs.openRate} /></div>
           <div class="card span-4"><h2>Role mix</h2><p class="note">Classified from job titles</p><${ChartBox} config=${configs.roles} /></div>
-          <div class="card span-4"><h2>Top locations</h2><p class="note">State / province / country, on-site</p><${ChartBox} config=${configs.regions} /></div>
+          <div class="card span-4"><h2>Top locations</h2><p class="note">State / province / country, on-site · <span style=${{ color: CANADA_RED }}>■</span> Canada</p><${ChartBox} config=${configs.regions} /></div>
           <div class="card span-4"><h2>Degree eligibility</h2><p class="note">Who can apply</p><${ChartBox} config=${configs.degrees} height=${140} />
             <h2 style=${{ marginTop: 14 }}>Top hiring companies</h2>
             <table><tbody>${d.companies.slice(0, 6).map((c) => html`
               <tr key=${c.company}><td>${c.company}</td><td class="num">${c.n}</td><td class="num muted">${c.open} open</td></tr>`)}</tbody></table>
           </div>
-          <div class="card span-12"><h2>Listings</h2><p class="note">Open postings first, newest first</p><${Listings} filters=${filters} /></div>
+          <div class="card span-12"><h2>Listings</h2><p class="note">${base.canadaFirst ? "Canadian postings first, then " : ""}open first, newest first</p><${Listings} filters=${filters} /></div>
         </div>`}
     </div>`;
 }

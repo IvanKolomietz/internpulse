@@ -70,6 +70,24 @@ class PipelineTest(unittest.TestCase):
         s = q.summary(self.conn, q.Filters(country="Canada"))
         self.assertEqual(s["total"], 1)
 
+    def test_canada_count_in_summary(self):
+        self.assertEqual(q.summary(self.conn, q.Filters())["canada"], 1)  # only #4 (Toronto)
+
+    def test_canada_overview_ignores_country_filter(self):
+        ca = q.canada_overview(self.conn, q.Filters(country="US"))
+        self.assertEqual(ca["total"], 1)
+        self.assertEqual(ca["provinces"], [{"province": "ON", "n": 1}])
+        self.assertEqual(ca["cities"], [{"city": "Toronto, ON", "n": 1}])
+        self.assertEqual(ca["companies"][0]["company"], "Globex")
+
+    def test_canada_first_sort(self):
+        normal = q.listings(self.conn, q.Filters())["rows"]
+        first = q.listings(self.conn, q.Filters(), home_first=True)["rows"]
+        self.assertNotEqual(normal[0]["id"], "4")
+        self.assertEqual(first[0]["id"], "4")
+        self.assertEqual(first[0]["in_canada"], 1)
+        self.assertEqual(len(first), len(normal))  # same rows, only reordered
+
     def test_open_rate_by_age(self):
         rows = {r["age_weeks"]: r for r in q.open_rate_by_age(self.conn, q.Filters())}
         self.assertEqual(rows[0]["n"], 3)          # #1, #2, #8 posted this week
@@ -116,7 +134,8 @@ class ApiTest(unittest.TestCase):
             return e.code, json.load(e)
 
     def test_every_endpoint_returns_json(self):
-        for path in ["options", "summary", "trend", "roles", "companies", "regions", "open-rate", "degrees", "listings"]:
+        for path in ["options", "summary", "trend", "roles", "companies", "regions", "open-rate", "degrees",
+                     "canada", "listings", "listings?canada_first=1"]:
             with self.subTest(path=path):
                 status, body = self.get(f"/api/{path}")
                 self.assertEqual(status, 200)
