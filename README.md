@@ -1,14 +1,14 @@
 # InternPulse
 
-**What does the tech internship market actually look like?** InternPulse ingests ~17,000 real
-internship postings, cleans and normalizes them into a relational database, and serves an
+**What does the North American tech internship market actually look like?** InternPulse ingests ~17,000 real
+internship postings, focuses on the ~16,000 in Canada and the US, cleans and normalizes them into a relational database, and serves an
 interactive dashboard answering questions like:
 
 - When do companies post Summer internships, and how fast do postings close?
 - Which roles (SWE, Data Analytics, ML, QA, Quant…) have the most openings?
 - Where are the jobs, who is hiring, and which roles are open to undergrads?
 
-It is **Canada-focused** but keeps every country: a Canada panel (postings by province and city, and who is hiring there), a Canada KPI, Canadian provinces highlighted on the location chart, and a "Canada first" sort for the listings.
+It covers **Canada and the US**, with a **Canada focus**: a Canada panel (postings by province and city, and who is hiring there), a Canada KPI, Canadian provinces highlighted on the location chart, and a "Canada first" sort for the listings.
 
 Data source: the community-maintained [SimplifyJobs/Summer2027-Internships](https://github.com/SimplifyJobs/Summer2027-Internships) listings feed.
 
@@ -39,7 +39,7 @@ SimplifyJobs JSON ──► pipeline/ (Python)          ──► SQLite (normal
 | `analytics/queries.py` | SQL analytics: CTEs, conditional aggregation, date bucketing; all filters are bound parameters (SQL-injection safe) |
 | `server.py` | Standard-library REST API with input validation (400s), 404s, read-only DB connections |
 | `static/` | React 18 dashboard (no build step) with Chart.js; light/dark mode, responsive |
-| `tests/` | 40 unit + integration tests: classifier edge cases, parser cases, known-answer fixture DB, API status codes, injection attempt |
+| `tests/` | 41 unit + integration tests: classifier edge cases, parser cases, known-answer fixture DB, API status codes, injection attempt |
 | `.github/workflows/ci.yml` | CI matrix (Ubuntu + Windows × Python 3.11/3.12) plus a weekly live-data smoke test that catches upstream schema drift |
 
 **Zero dependencies.** Everything runs on the Python 3.11+ standard library.

@@ -74,7 +74,7 @@ function Filters({ options, counts, filters, setFilters, search, setSearch }) {
         ${options.terms.map((t) => html`<option key=${t} value=${t}>${t}</option>`)}
       </select>
       <select aria-label="Country" value=${filters.country} onChange=${(e) => setFilters((f) => ({ ...f, country: e.target.value }))}>
-        <option value="">All countries</option>
+        <option value="">All of North America</option>
         ${countryOptions(options.countries, counts).map(({ country, n }) => html`
           <option key=${country} value=${country} disabled=${n === 0 && country !== filters.country}>${country} (${fmt(n)})</option>`)}
       </select>
@@ -246,7 +246,7 @@ function App() {
       <header>
         <div>
           <h1>Intern<span>Pulse</span></h1>
-          <p class="sub">What the tech internship market actually looks like, from ${fmt(d.summary?.total)} real postings.</p>
+          <p class="sub">What the North American tech internship market actually looks like, from ${fmt(d.summary?.total)} real postings in Canada and the US.</p>
         </div>
         <div class="stamp">source: SimplifyJobs/Summer2027-Internships</div>
       </header>
@@ -275,7 +275,7 @@ function App() {
           <div class="card span-8"><h2>New postings per week</h2><p class="note">Last 26 weeks, stacked by role family</p><${ChartBox} config=${configs.trend} /></div>
           <div class="card span-4"><h2>How fast postings close</h2><p class="note">% still open by posting age</p><${ChartBox} config=${configs.openRate} /></div>
           <div class="card span-4"><h2>Role mix</h2><p class="note">Classified from job titles</p><${ChartBox} config=${configs.roles} /></div>
-          <div class="card span-4"><h2>Top locations</h2><p class="note">${base.country ? `On-site in ${base.country}: region, or city where there is none` : html`State / province (or city), on-site · <span style=${{ color: CANADA_RED }}>■</span> Canada`}</p><${ChartBox} config=${configs.regions} /></div>
+          <div class="card span-4"><h2>Top locations</h2><p class="note">${base.country ? `On-site in ${base.country}: region, or city where there is none` : html`State / province, on-site · <span style=${{ color: CANADA_RED }}>■</span> Canada`}</p><${ChartBox} config=${configs.regions} /></div>
           <div class="card span-4"><h2>Degree eligibility</h2><p class="note">Who can apply</p><${ChartBox} config=${configs.degrees} height=${140} />
             <h2 style=${{ marginTop: 14 }}>Top hiring companies</h2>
             <table><tbody>${d.companies.slice(0, 6).map((c) => html`

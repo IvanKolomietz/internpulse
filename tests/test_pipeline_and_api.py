@@ -27,8 +27,8 @@ class PipelineTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_data_quality_report(self):
-        self.assertEqual(self.report["raw"], 9)
-        self.assertEqual(self.report["loaded"], 6)
+        self.assertEqual(self.report["raw"], 10)
+        self.assertEqual(self.report["loaded"], 7)
         self.assertEqual(self.report["rejected_duplicate"], 1)
         self.assertEqual(self.report["rejected_invalid"], 2)
         self.assertEqual(self.report["missing_term"], 1)
@@ -48,7 +48,7 @@ class PipelineTest(unittest.TestCase):
         build(RAW, path)
         conn = sqlite3.connect(path)
         try:
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0], 6)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM listings").fetchone()[0], 7)
         finally:
             conn.close()
 
@@ -88,6 +88,13 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(first[0]["in_canada"], 1)
         self.assertEqual(len(first), len(normal))  # same rows, only reordered
 
+    def test_only_north_america(self):
+        # #9 (London) is in the database but never counted; #8 has no location at all.
+        self.assertEqual(q.summary(self.conn, q.Filters())["total"], 5)
+        ids = {r["id"] for r in q.listings(self.conn, q.Filters(), limit=50)["rows"]}
+        self.assertEqual(ids, {"1", "2", "3", "4", "5"})
+        self.assertEqual(q.filter_options(self.conn)["countries"], ["Canada", "US"])
+
     def test_country_counts_ignore_country_filter(self):
         rows = q.country_counts(self.conn, q.Filters(country="Canada"))
         self.assertEqual({r["country"]: r["n"] for r in rows}, {"US": 4, "Canada": 1})
@@ -98,13 +105,13 @@ class PipelineTest(unittest.TestCase):
 
     def test_open_rate_by_age(self):
         rows = {r["age_weeks"]: r for r in q.open_rate_by_age(self.conn, q.Filters())}
-        self.assertEqual(rows[0]["n"], 3)          # #1, #2, #8 posted this week
+        self.assertEqual(rows[0]["n"], 2)          # #1, #2 (#8 has no location, #9 is in the UK)
         self.assertEqual(rows[0]["open_pct"], 100.0)
         self.assertEqual(rows[2]["open_pct"], 0.0)  # #3 closed at 20 days
 
     def test_degrees(self):
         rows = {r["level"]: r["n"] for r in q.degree_requirements(self.conn, q.Filters())}
-        self.assertEqual(rows, {"Bachelor's eligible": 4, "Graduate only": 1, "Not specified": 1})
+        self.assertEqual(rows, {"Bachelor's eligible": 3, "Graduate only": 1, "Not specified": 1})
 
     def test_search_is_parameterized(self):
         # A classic injection string must be treated as literal text, not SQL.
@@ -113,7 +120,7 @@ class PipelineTest(unittest.TestCase):
 
     def test_listings_paging_and_order(self):
         res = q.listings(self.conn, q.Filters(), limit=2, offset=0)
-        self.assertEqual(res["total"], 6)
+        self.assertEqual(res["total"], 5)
         self.assertEqual(len(res["rows"]), 2)
         self.assertTrue(all(r["active"] for r in res["rows"]))  # open postings first
 
@@ -160,7 +167,7 @@ class ApiTest(unittest.TestCase):
 
     def test_bad_params_400(self):
         for path in ["/api/listings?limit=abc", "/api/listings?limit=5000", "/api/listings?offset=-1",
-                     "/api/summary?q=" + "x" * 101]:
+                     "/api/summary?q=" + "x" * 101, "/api/summary?country=Germany"]:
             with self.subTest(path=path):
                 status, body = self.get(path)
                 self.assertEqual(status, 400)

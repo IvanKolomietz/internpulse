@@ -28,4 +28,6 @@ RAW = [
     {**listing("6", "Hidden Co", "SWE Intern"), "is_visible": False},  # hidden -> rejected
     listing("7", "", "No Company Intern"),                           # missing company -> rejected
     listing("8", "Umbrella", "Backend Developer Intern", terms=("N/A",), locations=()),
+    # Outside North America: loaded, but excluded from every dashboard query.
+    listing("9", "Hooli", "Software Engineer Intern", locations=("London, UK",)),
 ]

@@ -44,12 +44,15 @@ def parse_filters(qs: dict[str, list[str]]) -> q.Filters:
     search = one("q")
     if search and len(search) > 100:
         raise BadRequest("q too long")
+    country = one("country")
+    if country and country not in q.COUNTRIES:
+        raise BadRequest(f"country must be one of {', '.join(q.COUNTRIES)}")
     roles = [r for r in (one("roles") or "").split(",") if r]
     return q.Filters(
         term=one("term"),
         roles=roles,
         active_only=one("active") in {"1", "true"},
-        country=one("country"),
+        country=country,
         search=search,
     )
 

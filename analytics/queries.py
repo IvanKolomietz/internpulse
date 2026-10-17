@@ -9,6 +9,8 @@ import sqlite3
 from dataclasses import dataclass, field, replace
 
 HOME_COUNTRY = "Canada"
+# The dashboard covers North American postings only. Mexico has no postings in the source today.
+COUNTRIES = ("Canada", "US")
 IN_HOME = (
     "EXISTS (SELECT 1 FROM listing_locations hc WHERE hc.listing_id = {a}.id AND hc.country = '"
     + HOME_COUNTRY + "')"
@@ -24,7 +26,10 @@ class Filters:
     search: str | None = None
 
     def where(self, alias: str = "l") -> tuple[str, list]:
-        clauses, params = ["1=1"], []
+        # Always limited to postings with at least one location in a covered country.
+        clauses = [f"EXISTS (SELECT 1 FROM listing_locations na WHERE na.listing_id = {alias}.id"
+                   f" AND na.country IN ({','.join('?' * len(COUNTRIES))}))"]
+        params: list = list(COUNTRIES)
         if self.term:
             clauses.append(f"EXISTS (SELECT 1 FROM listing_terms t WHERE t.listing_id = {alias}.id AND t.term = ?)")
             params.append(self.term)
@@ -100,7 +105,10 @@ def top_companies(conn, f: Filters, limit: int = 15) -> list[dict]:
 def top_regions(conn, f: Filters, limit: int = 15) -> list[dict]:
     """On-site postings by state/province. With a country selected, only that country's places."""
     w, p = f.where()
-    in_country, extra = ("AND x.country = ?", [f.country]) if f.country else ("", [])
+    if f.country:
+        in_country, extra = "AND x.country = ?", [f.country]
+    else:
+        in_country, extra = f"AND x.country IN ({','.join('?' * len(COUNTRIES))})", list(COUNTRIES)
     return _rows(conn, f"""
         SELECT COALESCE(x.region, x.city, x.country, 'Unknown') AS region, x.country,
                COUNT(DISTINCT l.id) AS n
@@ -115,8 +123,8 @@ def country_counts(conn, f: Filters) -> list[dict]:
     return _rows(conn, f"""
         SELECT x.country, COUNT(DISTINCT l.id) AS n
         FROM listings l JOIN listing_locations x ON x.listing_id = l.id
-        WHERE {w} AND x.country IS NOT NULL
-        GROUP BY x.country ORDER BY n DESC, x.country""", p)
+        WHERE {w} AND x.country IN ({','.join('?' * len(COUNTRIES))})
+        GROUP BY x.country ORDER BY n DESC, x.country""", p + list(COUNTRIES))
 
 
 def open_rate_by_age(conn, f: Filters) -> list[dict]:
@@ -187,7 +195,5 @@ def filter_options(conn) -> dict:
             "SELECT term FROM listing_terms GROUP BY term ORDER BY COUNT(*) DESC")],
         "roles": [r[0] for r in conn.execute(
             "SELECT role FROM listings GROUP BY role ORDER BY COUNT(*) DESC")],
-        "countries": [r[0] for r in conn.execute(
-            "SELECT country FROM listing_locations WHERE country IS NOT NULL"
-            " GROUP BY country ORDER BY COUNT(*) DESC")],
+        "countries": list(COUNTRIES),
     }
