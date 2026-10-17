@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 12 * * 1"  # weekly: catch upstream data-format changes
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit + integration tests
+        run: python -m unittest discover -s tests -t . -v
+
+  live-data-smoke:
+    # Runs the real pipeline against today's upstream data to detect schema drift.
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ingest live data
+        run: python -m pipeline.ingest
+      - name: Sanity-check the result
+        run: |
+          python - <<'EOF'
+          import sqlite3
+          c = sqlite3.connect("data/internpulse.db")
+          n = c.execute("SELECT COUNT(*) FROM listings").fetchone()[0]
+          unparsed = c.execute("SELECT AVG(country IS NULL) FROM listing_locations").fetchone()[0]
+          print(f"{n} listings, {unparsed:.2%} unparsed locations")
+          assert n > 1000, "suspiciously few listings - upstream format may have changed"
+          assert unparsed < 0.02, "location parser is falling behind upstream data"
+          EOF
