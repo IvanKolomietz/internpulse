@@ -62,3 +62,10 @@ relies on fields that mean what they say. The reasoning is documented in `open_r
 - Track daily snapshots to measure true time-to-close
 - Skill extraction from job descriptions (TF-IDF / keyword frequency by role)
 - Rewrite the API in Go for comparison; deploy to a free host
+
+## How this was built
+
+Built with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding agent. I directed
+the project (choosing the data source, the questions to answer and the target stack), then reviewed
+and tested the generated code and verified the results against the raw data. That review is how the
+invalid "days open" metric described above was caught and replaced.
